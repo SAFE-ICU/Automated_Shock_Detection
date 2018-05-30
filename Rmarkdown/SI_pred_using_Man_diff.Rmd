@@ -1,0 +1,524 @@
+---
+title: "SI prediction using Manually extracted Difference"
+author: "Aditya"
+date: "24 May 2018"
+output: html_document
+---
+
+  # loading the data and packages 
+```{r}
+.libPaths(c(.libPaths(), "C:/Users/PICU/Documents/R/win-library/3.3"))
+library(lme4)
+library(nlme)
+library(randomForest)
+library(caret)
+library(ROCR)
+library(scales)
+func_path <- "C:/aditya/Thermal_images/Final_models/func/"
+data_path <-   "C:/aditya/Thermal_images/Final_models/Final_data/"
+########## Resutls will be saved to this path ########################
+save_path <- "C:/aditya/Thermal_images/Final_models/New patients/Final_models/Manual/"  
+
+source(paste0(func_path ,"fun_binary_shock_ind.R"))
+source(paste0(func_path ,"cp_max_thrsh.R"))
+
+#################### Data ###################
+for_modeling_diff_with_30min  <- read.csv(paste0(data_path,                 "for_modeling_with_mandiff_with_sm_time.csv"))
+
+for_modeling_diff_with_3hr  <-read.csv(paste0(data_path,
+                                        "for_modeling_with_mandiff_with_3hr.csv"))
+
+for_modeling_diff_with_6hr  <- read.csv(paste0(data_path,
+"for_modeling_with_mandiff_with_6hr.csv"))
+
+
+for_modeling_diff_with_12hr  <- read.csv(paste0(data_path, "for_modeling_with_mandiff_with_12hr.csv"))
+ 
+set.seed(2)
+
+```
+
+
+```{r}
+##########  removing samples with missing values of shock_ind ##############
+data_for_mod_post30minshock <- for_modeling_diff_with_30min[-which(is.na(for_modeling_diff_with_30min$Shock_ind_30min)),]
+dim(data_for_mod_post30minshock)
+data_for_mod_post30minshock <- data_for_mod_post30minshock[which(data_for_mod_post30minshock$type_of_bp_sm_tm == "ART"),]
+
+######### removing valibles with more than 10% missing data ########################
+data_for_mod_post30minshock<- data_for_mod_post30minshock[,-which(apply(is.na(data_for_mod_post30minshock),2,sum)>0.1*nrow(data_for_mod_post30minshock))]
+
+########### Shock ind conversion ############# 
+data_for_mod_post30minshock$binary_SI_Sm_Tm <- binary_shock_ind(
+  data_for_mod_post30minshock$age_mo ,data_for_mod_post30minshock$Shock_ind_30min
+)
+data_for_mod_post30minshock$binary_SI_Sm_Tm <- as.factor(data_for_mod_post30minshock$binary_SI_Sm_Tm) 
+
+data_for_mod_post30minshock$diff_percent <- (data_for_mod_post30minshock$diff/data_for_mod_post30minshock$abd)*100
+data_for_mod_post30minshock$diff_ratio <- (data_for_mod_post30minshock$diff/data_for_mod_post30minshock$abd)
+data_for_mod_post30minshock$Rescaled_Median_PR <- rescale(data_for_mod_post30minshock$Median_PR, c(0,1))
+
+
+#################### glmer ##########
+byclass_glmer<- list(list()) 
+overall_Acc_glmer<- list(list()) 
+AUC_glmer_all <- list(list())
+cutoff_glmer <- list(list())
+coefficients_glmer <- list()
+pval_glmer <- list()
+
+library(caret)
+parts = createDataPartition(unique(data_for_mod_post30minshock$UHID), times = 10, p = 0.7)
+
+sink(paste0(save_path, "confusion_mat_30min.txt"))
+pdf(paste0(save_path, "ROC_glmer_binary_shock_glmer_30min.pdf"))
+
+for(i in 1:10){
+  tr_uhid <- unique(data_for_mod_post30minshock$UHID)[parts[[i]]]
+  test_uhid <- unique(data_for_mod_post30minshock$UHID)[-parts[[i]]]
+  ###############################################
+  
+  class(data_for_mod_post30minshock)
+  tr_set_sm_tm <- data.frame(data_for_mod_post30minshock[which(data_for_mod_post30minshock$UHID %in% tr_uhid),])
+  test_set_sm_tm <- data_for_mod_post30minshock[-which(data_for_mod_post30minshock$UHID %in% tr_uhid),]
+  
+
+  print(binary_SI_Sm_Tm ~ diff_percent+Rescaled_Median_PR+age_mo+(1|UHID))
+  
+  fit_glmer_30min <- glmer(binary_SI_Sm_Tm ~   
+                           diff_percent+Rescaled_Median_PR+age_mo+(1|UHID), 
+                           data = tr_set_sm_tm, 
+                           family = binomial,
+                           control = glmerControl(optimizer = "bobyqa"),
+                            nAGQ = 5)
+  
+  summary_glmer <- summary(fit_glmer_30min) 
+  
+  diff_coef <- summary_glmer$coefficients[2,1]
+  diff_pval <- summary_glmer$coefficients[2,4]
+  
+  tr_pred_sm_tm <- predict(fit_glmer_30min, newdata = tr_set_sm_tm , allow.new.levels = T, type = 'response')
+  test_pred_sm_tm <- predict(fit_glmer_30min, newdata = test_set_sm_tm,allow.new.levels= T, type = 'response')
+  
+  pred_glmer_perf <- prediction(test_pred_sm_tm, test_set_sm_tm$binary_SI_Sm_Tm) 
+  perf_glmer <- performance(pred_glmer_perf, "tpr", "fpr")
+  cp_max_height_glmer <- cp_max_thrsh(perf_glmer) 
+  AUC_glmer= (performance(pred_glmer_perf, "auc")@y.values[[1]])
+  plot(perf_glmer,colorize =T, main=paste('ROC', 'Shock ind same time, AUC=', AUC_glmer,sep = ' ')) 
+  result_vec <- as.numeric(unlist(test_pred_sm_tm) > cp_max_height_glmer)
+  con <- data.frame(actual=test_set_sm_tm$binary_SI_Sm_Tm,result_vec)
+  conf <- confusionMatrix(con$result_vec,reference = con$actual, positive = "1")
+  #print(conf)
+  #i = 1
+  
+  coefficients_glmer[i] <- diff_coef
+  pval_glmer[i] <- diff_pval
+  byclass_glmer[i] <- conf[4]
+  overall_Acc_glmer[i]<-  conf[3]
+  cutoff_glmer[i] <- cp_max_height_glmer
+  AUC_glmer_all[i]= (performance(pred_glmer_perf, "auc")@y.values[[1]])
+}
+sink() 
+dev.off()
+
+
+glmer_models_sum <- data.frame(matrix(NA, ncol = 13, nrow = 5))
+colnames(glmer_models_sum) <-c("Coeff", "pval", "AUC", "Accuracy", "Sensitivity", "Specificity", "ppv", "npv","AUC_sd", "Acc_sd", "Sens_sd","Speci_sd","Cut_off_ROC")
+
+ten_fold_coefficients <- do.call(rbind , coefficients_glmer)
+ten_fold_pval  <- do.call(rbind , pval_glmer)
+ten_fold_auc <- do.call(rbind , AUC_glmer_all)
+ten_fold_accuracy <- do.call(rbind , overall_Acc_glmer)
+ten_fold_byclass <- do.call(rbind , byclass_glmer)
+ten_fold_cutoff <- do.call(rbind , cutoff_glmer)
+
+fit_glmer_30min <- glmer(binary_SI_Sm_Tm ~  
+                        diff_percent+Rescaled_Median_PR+age_mo+(1|UHID), 
+                         data = data_for_mod_post30minshock, 
+                         family = binomial,
+                         control = glmerControl(optimizer = "bobyqa"),
+                          nAGQ = 5)
+summary_glmer <- summary(fit_glmer_30min) 
+
+#table(data_for_mod_post30minshock$time_points)
+save(fit_glmer_30min, file = paste0(save_path, "fit_glmer_SI_0.RData"))
+
+coefficients_glmer_sm_tm <- summary_glmer$coefficients[2]
+pval_glmer_sm_tm <- summary_glmer$coefficients[2,4] 
+
+
+glmer_models_sum[1,] <- c(coefficients_glmer_sm_tm,
+                          pval_glmer_sm_tm,
+                          mean(ten_fold_auc[,1]),
+                          mean(ten_fold_accuracy[,1]),
+                          mean(ten_fold_byclass[,1]),
+                          mean(ten_fold_byclass[,2]),
+                          mean(ten_fold_byclass[,3]),
+                          mean(ten_fold_byclass[,4]),
+                          sd(ten_fold_auc[,1]),
+                          sd(ten_fold_accuracy[,1]),
+                          sd(ten_fold_byclass[,1]),
+                          sd(ten_fold_byclass[,2]),
+                          mean(ten_fold_cutoff[,1]))
+
+```
+
+```{r}
+########### removing the samples with missing shock ind ###############
+data_for_mod_post3hrshock <- for_modeling_diff_with_3hr[-which(is.na(for_modeling_diff_with_3hr$Shock_ind_post3hr)),]
+ dim(data_for_mod_post3hrshock)
+
+data_for_mod_post3hrshock <- data_for_mod_post3hrshock[which(data_for_mod_post3hrshock$type_of_bp_3hr == "ART"),]
+############## removin  the variable with >10% missing data ########
+
+data_for_mod_post3hrshock <- data_for_mod_post3hrshock[,-which(apply(is.na(data_for_mod_post3hrshock),2,sum) >0.1*nrow(data_for_mod_post3hrshock))]
+data_for_mod_post3hrshock$Rescaled_Median_PR <- rescale(data_for_mod_post3hrshock$Median_PR, c(0,1)) 
+
+
+data_for_mod_post3hrshock$diff_percent <- (data_for_mod_post3hrshock$diff/data_for_mod_post3hrshock$abd)*100
+sum(is.na(data_for_mod_post3hrshock$age_mo))
+sum(is.na(data_for_mod_post3hrshock$Shock_ind_post3hr))
+######### shock ind binary convertion ############
+data_for_mod_post3hrshock$binary_SI_3hr <- binary_shock_ind(
+  data_for_mod_post3hrshock$age_mo ,data_for_mod_post3hrshock$Shock_ind_post3hr)
+
+data_for_mod_post3hrshock$binary_SI_3hr <- as.factor(data_for_mod_post3hrshock$binary_SI_3hr)
+
+data_for_mod_post3hrshock$diff_ratio <- (data_for_mod_post3hrshock$diff/data_for_mod_post3hrshock$abd)
+############ data partitioning ###############
+set.seed(3)
+byclass_glmer<- list(list()) 
+overall_Acc_glmer<- list(list()) 
+AUC_glmer_all <- list(list())
+cutoff_glmer <- list(list())
+coefficients_glmer <- list()
+pval_glmer <- list()
+
+
+library(caret)
+parts = createDataPartition(unique(data_for_mod_post3hrshock$UHID), times = 10, p = 0.7)
+
+sink(paste0(save_path, "confusion_mat_3hr.txt"))
+pdf(paste0(save_path, "ROC_glmer_binary_shock_glmer_3hr.pdf"))
+
+for(i in 1:10){
+  tr_uhid <- unique(data_for_mod_post3hrshock$UHID)[parts[[i]]]
+  test_uhid <- unique(data_for_mod_post3hrshock$UHID)[-parts[[i]]]
+  
+  ##################### glmer ####################
+  tr_set_post3hr <- data_for_mod_post3hrshock[which(data_for_mod_post3hrshock$UHID %in% tr_uhid),]
+  test_set_post3hr <- data_for_mod_post3hrshock[-which(data_for_mod_post3hrshock$UHID %in% tr_uhid),]
+  
+  
+  fit_glmer_3hr <- glmer(binary_SI_3hr ~ 
+                         diff_percent+Rescaled_Median_PR+age_mo+(1|UHID),
+                         data = tr_set_post3hr,
+                         family = binomial,
+                         control = glmerControl(optimizer = "bobyqa"),
+                          nAGQ = 5)
+  
+  summary_glmer_3hr <- summary(fit_glmer_3hr)
+  diff_coef <- summary_glmer_3hr$coefficients[2,1]
+  diff_pval <- summary_glmer_3hr$coefficients[2,4]
+  
+  
+  tr_pred_post3hr <- predict(fit_glmer_3hr, newdata = tr_set_post3hr , allow.new.levels = T, type = 'response')
+  test_pred_post3hr <- predict(fit_glmer_3hr, newdata = test_set_post3hr,allow.new.levels= T, type = 'response')
+  
+  
+  pred_glmer_perf <- prediction(test_pred_post3hr, test_set_post3hr$binary_SI_3hr)
+  perf_glmer <- performance( pred_glmer_perf, "tpr", "fpr")
+  cp_max_height_glmer <- cp_max_thrsh(perf_glmer) 
+  AUC_glmer= (performance(pred_glmer_perf, "auc")@y.values[[1]])
+  plot(perf_glmer,colorize =T, main=paste('ROC', 'Shock ind 3hr, AUC=', AUC_glmer,sep = ' ')) 
+  result_vec <- as.numeric(unlist(test_pred_post3hr) > cp_max_height_glmer)
+  con <- data.frame(actual=test_set_post3hr$binary_SI_3hr,result_vec)
+  conf <- confusionMatrix(con$result_vec,reference = con$actual, positive = "1")
+  #print(conf)
+  #i = 2
+  
+  coefficients_glmer[i] <- diff_coef
+  pval_glmer[i] <- diff_pval
+  byclass_glmer[i] <- conf[4]
+  overall_Acc_glmer[i] <-  conf[3]
+  cutoff_glmer[i] <- cp_max_height_glmer
+  AUC_glmer_all[i]= (performance(pred_glmer_perf, "auc")@y.values[[1]])
+}
+sink()
+dev.off()
+
+
+ten_fold_coefficients <- do.call(rbind , coefficients_glmer)
+ten_fold_pval  <- do.call(rbind , pval_glmer)
+ten_fold_auc <- do.call(rbind , AUC_glmer_all)
+ten_fold_accuracy <- do.call(rbind , overall_Acc_glmer)
+ten_fold_byclass <- do.call(rbind , byclass_glmer)
+ten_fold_cutoff <- do.call(rbind , cutoff_glmer)
+
+fit_glmer_3hr <- glmer( binary_SI_3hr~ 
+                        diff_percent+Rescaled_Median_PR+age_mo+(1|UHID), 
+                        data = data_for_mod_post3hrshock, 
+                        family = binomial,
+                        control = glmerControl(optimizer = "bobyqa"),
+                         nAGQ = 5)
+summary_glmer <- summary(fit_glmer_3hr) 
+
+save(fit_glmer_3hr, file = paste0(save_path,"fit_glmer_SI_3.RData"))
+
+coefficients_glmer_3hr <- summary_glmer$coefficients[2]
+pval_glmer_3hr <- summary_glmer$coefficients[2,4] 
+
+
+glmer_models_sum[2,] <- c(coefficients_glmer_3hr,
+                          pval_glmer_3hr,
+                          mean(ten_fold_auc[,1]),
+                          mean(ten_fold_accuracy[,1]),
+                          mean(ten_fold_byclass[,1]),
+                          mean(ten_fold_byclass[,2]),
+                          mean(ten_fold_byclass[,3]),
+                          mean(ten_fold_byclass[,4]),
+                          sd(ten_fold_auc[,1]),
+                          sd(ten_fold_accuracy[,1]),
+                          sd(ten_fold_byclass[,1]),
+                          sd(ten_fold_byclass[,2]),
+                          mean(ten_fold_cutoff[,1]))
+
+```
+
+```{r}
+########### removing the samples with missing shock ind ###############
+
+data_for_mod_post6hrshock <- for_modeling_diff_with_6hr[-which(is.na(for_modeling_diff_with_6hr$Shock_ind_post6hr)),]
+dim(data_for_mod_post6hrshock)
+
+data_for_mod_post6hrshock <- data_for_mod_post6hrshock[which(data_for_mod_post6hrshock$type_of_bp_6hr == "ART"),]
+
+######### Removing row with missing age #######
+data_for_mod_post6hrshock <- data_for_mod_post6hrshock[- which(is.na(data_for_mod_post6hrshock$age_mo)),]
+data_for_mod_post6hrshock$diff_percent <- (data_for_mod_post6hrshock$diff/data_for_mod_post6hrshock$abd)*100
+######### shock ind binary convertion ############
+sum(is.na(data_for_mod_post6hrshock$Shock_ind_post6hr))
+data_for_mod_post6hrshock$binary_SI_6hr <- binary_shock_ind(
+  data_for_mod_post6hrshock$age_mo ,data_for_mod_post6hrshock$Shock_ind_post6hr)
+
+data_for_mod_post6hrshock$diff_ratio <- (data_for_mod_post6hrshock$diff/data_for_mod_post6hrshock$abd)
+data_for_mod_post6hrshock$binary_SI_6hr <- as.factor(data_for_mod_post6hrshock$binary_SI_6hr)
+
+data_for_mod_post6hrshock$Rescaled_Median_PR <- rescale(data_for_mod_post6hrshock$Median_PR, c(0,1)) 
+
+parts = createDataPartition(unique(data_for_mod_post6hrshock$UHID), times = 10, p = 0.7)
+
+byclass_glmer<- list(list()) 
+overall_Acc_glmer<- list(list()) 
+AUC_glmer_all <- list(list())
+cutoff_glmer <- list(list())
+coefficients_glmer <- list()
+pval_glmer <- list()
+
+sink(paste0(save_path, "confusion_mat_6hr.txt"))
+pdf(paste0(save_path, "ROC_glmer_binary_shock_glmer_6hr.pdf"))
+
+for(i in 1:10){
+  
+  tr_uhid <- unique(data_for_mod_post6hrshock$UHID)[parts[[i]]]
+  test_uhid <- unique(data_for_mod_post6hrshock$UHID)[-parts[[i]]]
+  
+  tr_set_post6hr <- data.frame(data_for_mod_post6hrshock[which(data_for_mod_post6hrshock$UHID %in% tr_uhid),])
+  test_set_post6hr <- data.frame(data_for_mod_post6hrshock[-which(data_for_mod_post6hrshock$UHID %in% tr_uhid),])
+  
+  
+  fit_glmer_6hr <- glmer(binary_SI_6hr ~ 
+                             diff_percent + Rescaled_Median_PR+age_mo+(1|UHID),
+                         data = tr_set_post6hr,
+                         family = binomial,
+                         control = glmerControl(optimizer = "bobyqa"),
+                          nAGQ = 5)
+  
+  summary_glmer_6hr <- summary(fit_glmer_6hr)
+  diff_coef <- summary_glmer_6hr$coefficients[2,1]
+  diff_pval <- summary_glmer_6hr$coefficients[2,4]
+  
+  
+  tr_pred_post6hr <- predict(fit_glmer_6hr, newdata = tr_set_post6hr , allow.new.levels = T, type = 'response')
+  test_pred_post6hr <- predict(fit_glmer_6hr, newdata = test_set_post6hr,allow.new.levels= T, type = 'response')
+  
+  
+  pred_glmer_perf <- prediction(test_pred_post6hr, test_set_post6hr$binary_SI_6hr)
+  perf_glmer <- performance( pred_glmer_perf, "tpr", "fpr")
+  cp_max_height_glmer <- cp_max_thrsh(perf_glmer) 
+  AUC_glmer= (performance(pred_glmer_perf, "auc")@y.values[[1]])
+  plot(perf_glmer,colorize =T, main=paste('ROC', 'Shock ind at 6hr, AUC=', AUC_glmer,sep = ' ')) 
+  result_vec <- as.numeric(unlist(test_pred_post6hr) > cp_max_height_glmer)
+  con <- data.frame(actual=test_set_post6hr$binary_SI_6hr,result_vec)
+  conf <- confusionMatrix(con$result_vec,reference = con$actual, positive = "1")
+  #print(conf)
+  #i = 3
+  
+  coefficients_glmer[i] <- diff_coef
+  pval_glmer[i] <- diff_pval  
+  byclass_glmer[i] <- conf[4]
+  overall_Acc_glmer[i] <-  conf[3]
+  cutoff_glmer[i] <- cp_max_height_glmer
+  AUC_glmer_all[i]= (performance(pred_glmer_perf, "auc")@y.values[[1]])
+}
+sink()
+dev.off()
+
+
+ten_fold_coefficients <- do.call(rbind , coefficients_glmer)
+ten_fold_pval  <- do.call(rbind , pval_glmer)
+ten_fold_auc <- do.call(rbind , AUC_glmer_all)
+ten_fold_accuracy <- do.call(rbind , overall_Acc_glmer)
+ten_fold_byclass <- do.call(rbind , byclass_glmer)
+ten_fold_cutoff <- do.call(rbind , cutoff_glmer)
+
+fit_glmer_6hr <- glmer( binary_SI_6hr~
+                            diff_percent + Rescaled_Median_PR+age_mo+(1|UHID), 
+                        data = data_for_mod_post6hrshock, 
+                        family = binomial,
+                        control = glmerControl(optimizer = "bobyqa"),
+                         nAGQ = 5)
+summary_glmer <- summary(fit_glmer_6hr) 
+
+save(fit_glmer_6hr, file = paste0(save_path,"fit_glmer_SI_6.RData"))
+
+coefficients_glmer_6hr <- summary_glmer$coefficients[2]
+pval_glmer_6hr <- summary_glmer$coefficients[2,4] 
+
+
+glmer_models_sum[3,] <- c(coefficients_glmer_6hr,
+                          pval_glmer_6hr,
+                          mean(ten_fold_auc[,1]),
+                          mean(ten_fold_accuracy[,1]),
+                          mean(ten_fold_byclass[,1]),
+                          mean(ten_fold_byclass[,2]),
+                          mean(ten_fold_byclass[,3]),
+                          mean(ten_fold_byclass[,4]),
+                          sd(ten_fold_auc[,1]),
+                          sd(ten_fold_accuracy[,1]),
+                          sd(ten_fold_byclass[,1]),
+                          sd(ten_fold_byclass[,2]),
+                          mean(ten_fold_cutoff[,1]))
+
+```
+
+```{r}
+data_for_mod_post12hrshock <- for_modeling_diff_with_12hr[-which(is.na(for_modeling_diff_with_12hr$Shock_ind_post12hr)),]
+
+###################################
+data_for_mod_post12hrshock<- 
+  data_for_mod_post12hrshock[,-which(apply(is.na(data_for_mod_post12hrshock),2,sum)>0.1*nrow(data_for_mod_post12hrshock))]
+
+data_for_mod_post12hrshock <- data_for_mod_post12hrshock[which(data_for_mod_post12hrshock$type_of_bp_12hr == "ART"),]
+
+data_for_mod_post12hrshock <- data_for_mod_post12hrshock[-which(is.na(data_for_mod_post12hrshock$age_mo)),]
+######### shock ind binary convertion ############
+data_for_mod_post12hrshock$binary_SI_12hr <- binary_shock_ind(
+  data_for_mod_post12hrshock$age_mo ,data_for_mod_post12hrshock$Shock_ind_post12hr)
+
+data_for_mod_post12hrshock$diff_percent <- (data_for_mod_post12hrshock$diff/data_for_mod_post12hrshock$abd)*100
+data_for_mod_post12hrshock$diff_ratio <- (data_for_mod_post12hrshock$diff/data_for_mod_post12hrshock$abd)
+data_for_mod_post12hrshock$binary_SI_12hr <- as.factor(data_for_mod_post12hrshock$binary_SI_12hr)
+data_for_mod_post12hrshock$Rescaled_Median_PR <- rescale(data_for_mod_post12hrshock$Median_PR, c(0,1)) 
+############################
+
+byclass_glmer<- list(list()) 
+overall_Acc_glmer<- list(list()) 
+AUC_glmer_all <- list(list())
+cutoff_glmer <- list(list())
+coefficients_glmer <- list()
+pval_glmer <- list()
+
+parts = createDataPartition(unique(data_for_mod_post12hrshock$UHID), times = 10, p = 0.7)
+
+sink(paste0(save_path, "confusion_mat_12hr.txt"))
+pdf(paste0(save_path, "ROC_glmer_binary_shock_glmer_12hr.pdf"))
+
+for(i in 1:10){
+  
+  tr_uhid <- unique(data_for_mod_post12hrshock$UHID)[parts[[i]]]
+  test_uhid <- unique(data_for_mod_post12hrshock$UHID)[-parts[[i]]]
+  
+  
+  tr_set_post12hr <- data_for_mod_post12hrshock[which(data_for_mod_post12hrshock$UHID %in% tr_uhid),]
+  test_set_post12hr <- data_for_mod_post12hrshock[-which(data_for_mod_post12hrshock$UHID %in% tr_uhid),]
+  
+  fit_glmer_12hr <- glmer(binary_SI_12hr ~ 
+                              diff_percent + Rescaled_Median_PR+age_mo+(1|UHID),
+                          data = tr_set_post12hr,
+                          family = binomial,
+                          control = glmerControl(optimizer = "bobyqa"),
+                           nAGQ = 5)
+  
+  summary_glmer_12hr <- summary(fit_glmer_12hr)
+  
+  diff_coef <- summary_glmer_12hr$coefficients[2,1]
+  diff_pval <- summary_glmer_12hr$coefficients[2,4]
+  
+  tr_pred_post12hr <- predict(fit_glmer_12hr, newdata = tr_set_post12hr , allow.new.levels = T, type = 'response')
+  test_pred_post12hr <- predict(fit_glmer_12hr, newdata = test_set_post12hr,allow.new.levels= T, type = 'response')
+  
+  
+  pred_glmer_perf <- prediction(test_pred_post12hr, test_set_post12hr$binary_SI_12hr)
+  perf_glmer <- performance( pred_glmer_perf, "tpr", "fpr")
+  cp_max_height_glmer <- cp_max_thrsh(perf_glmer) 
+  AUC_glmer= (performance(pred_glmer_perf, "auc")@y.values[[1]])
+  plot(perf_glmer,colorize =T, main=paste('ROC', 'Shock ind at 12hr, AUC=', AUC_glmer,sep = ' ')) 
+  result_vec <- as.numeric(unlist(test_pred_post12hr) > cp_max_height_glmer)
+  con <- data.frame(actual=test_set_post12hr$binary_SI_12hr,result_vec)
+  conf <- confusionMatrix(con$result_vec,reference = con$actual, positive = "1")
+  #print(conf)
+  
+  #i = 4
+  
+  coefficients_glmer[i] <- diff_coef
+  pval_glmer[i] <- diff_pval
+  byclass_glmer[i] <- conf[4]
+  overall_Acc_glmer[i] <-  conf[3]
+  cutoff_glmer[i] <- cp_max_height_glmer
+  AUC_glmer_all[i]= (performance(pred_glmer_perf, "auc")@y.values[[1]])
+}
+
+sink()
+dev.off()
+
+ten_fold_coefficients <- do.call(rbind , coefficients_glmer)
+ten_fold_pval  <- do.call(rbind , pval_glmer)
+ten_fold_auc <- do.call(rbind , AUC_glmer_all)
+ten_fold_accuracy <- do.call(rbind , overall_Acc_glmer)
+ten_fold_byclass <- do.call(rbind , byclass_glmer)
+ten_fold_cutoff <- do.call(rbind , cutoff_glmer)
+
+fit_glmer_12hr <- glmer(binary_SI_12hr~ 
+                          diff_percent + Rescaled_Median_PR+age_mo+(1|UHID), 
+                         data = data_for_mod_post12hrshock, 
+                         family = binomial,
+                         control = glmerControl(optimizer = "bobyqa"),
+                          nAGQ = 5)
+summary_glmer <- summary(fit_glmer_12hr) 
+
+save(fit_glmer_12hr, file = paste0(save_path,"fit_glmer_SI_12.RData"))
+
+coefficients_glmer_12hr <- summary_glmer$coefficients[2]
+pval_glmer_12hr <- summary_glmer$coefficients[2,4] 
+
+
+glmer_models_sum[4,] <- c(coefficients_glmer_12hr,
+                          pval_glmer_12hr,
+                          mean(ten_fold_auc[,1]),
+                          mean(ten_fold_accuracy[,1]),
+                          mean(ten_fold_byclass[,1]),
+                          mean(ten_fold_byclass[,2]),
+                          mean(ten_fold_byclass[,3]),
+                          mean(ten_fold_byclass[,4]),
+                          sd(ten_fold_auc[,1]),
+                          sd(ten_fold_accuracy[,1]),
+                          sd(ten_fold_byclass[,1]),
+                          sd(ten_fold_byclass[,2]),
+                          mean(ten_fold_cutoff[,1]))
+
+print(glmer_models_sum)
+
+print(glmer_models_sum)
+write.csv(glmer_models_sum, paste0(save_path, "summ_all_models.csv"), row.names = F)
+
