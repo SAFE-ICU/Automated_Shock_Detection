@@ -103,12 +103,9 @@ for folder in folders :
                         new_img = new_img
                     else:
                         new_img= cv2.cvtColor(new_img, cv2.COLOR_BGR2GRAY)
-                        #new_img = 0.2126*new_img[:,:,0]+0.7152*new_img[:,:,1]+0.0712*new_img[:,:,2]
+    
                     new_img = new_img.astype(np.uint8)
-                    #clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8,8))
-                    #new_img_patch = clahe.apply(new_img)
-                    #min_in = 150
-                    #ret , new_img = cv2.threshold(new_img_patch,min_in,255,cv2.THRESH_TOZERO)
+                    
                     [R,C] = new_img.shape
                     if R > C :
                         new_img = ndimage.rotate(new_img, 90)
@@ -140,7 +137,7 @@ for folder in folders :
                             new_img_patch = new_img[i:(i+win_size[0]),j:(j+win_size[1])]
                             #new_img_patch = new_img_patch.astype(np.uint8)
                             #min_in = np.amin(new_img_patch)
-                            min_in = 127
+                            min_in = np.median(new_img_patch)
                             #new_img_patch = cv2.equalizeHist(new_img_patch)
                             #clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(12,12))
                             #new_img_patch = clahe.apply(new_img_patch)
@@ -205,7 +202,7 @@ for folder in folders :
                                 new_img_patch = new_img[i:(i+win_size[0]),j:(j+win_size[1])]
                                 #new_img_patch = new_img_patch.astype(np.uint8)
                                 #min_in = np.amin(new_img_patch)
-                                min_in = 150
+                                min_in = np.median(new_img_patch)
                                 #new_img_patch = cv2.equalizeHist(new_img_patch)
                                 clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(12,12))
                                 new_img_patch = clahe.apply(new_img_patch)
@@ -269,51 +266,7 @@ for folder in folders :
                     print(med_circle_foot)
                     #non_zero_patch_foot = patch_thresh[np.nonzero(patch_thresh)]
                     #med_patch_foot = np.median(non_zero_patch_foot)
-                    '''
-                    for cd in cds:
-                        ax[0].add_patch(patches.Rectangle((n_leg[cd,0],n_leg[cd,1]),win_size[1],win_size[0],linewidth=1,edgecolor='b',facecolor='none'))
-                        lc =(n_leg[(len(cds)-1),0]+(win_size[1])/2, n_leg[(len(cds)-1),1]+(win_size[0])/2)
-                        patch_coordi  = ((win_size[1])/2,(win_size[0])/2)
-                        new_img_patch = new_img[(n_leg[cds[len(cds)-1],1]):(n_leg[(len(cds)-1),1]+win_size[1]),(n_leg[(len(cds)-1),0]):(n_leg[(len(cds)-1),0]+win_size[0])]
-                        new_img_patch = new_img_patch.astype(np.uint8)
-                        #min_in = np.amin(new_img_patch)
-                        min_in = 127
-                        ret ,patch_thresh= cv2.threshold(new_img_patch,min_in,255,cv2.THRESH_TOZERO)
-                        radius = int((win_size[0])*(0.2))
-                        a = patch_thresh
-                        cx, cy = patch_coordi[0], patch_coordi[1] # The center of circle
-                        y, x = np.ogrid[-radius: radius, -radius: radius]
-                        index = x**2 + y**2 <= radius**2
-                        a_with_circle = a[cy-radius:cy+radius, cx-radius:cx+radius][index]    
-                        a_nonzero = a_with_circle[np.nonzero(a_with_circle)]
-                        if len(a_nonzero)!=0:
-                            med_patch_foot = np.median(a_nonzero)
-                        else:
-                            med_patch_foot = 0
-                        
-                        contours,hierarchy = cv2.findContours(im_thresh, 1, 2)
-                        cnt = contours[0]
-                        M = cv2.moments(cnt)
-                        if M['m00']!=0:
-                            cx = int(M['m10']/M['m00'])
-                            cy = int(M['m01']/M['m00'])
-                        else:
-                            cx = lc[0]
-                            cy = lc[1]
-                        area = cv2.contourArea(cnt)
-                        perimeter = cv2.arcLength(cnt,True)
-                        epsilon = 0.1*cv2.arcLength(cnt,True)
-                        approx = cv2.approxPolyDP(cnt,epsilon,True)
-                        '''
-                
-                    ####### sliding window ##########-2016-09-03-20h02m21s219
-                    #head_indice= np.argmax(pred_prob[pred_win=='H'])
-                    #abd_indice= np.argmax(pred_prob[pred_win=='A'])
-                    #diaper_indice= np.argmax(pred_prob[pred_win=='D'])
-                    #leg_indice= np.argmax(pred_prob[pred_win=='L'])
-                        
-                    #plt.show()
-                ################################### abd detection ############################# 
+            ################################### abd detection ############################# 
                     list_test_hog = []
                     list_box_coord= []
                     y = regr_A_tar_y.predict(TAR)[0,0]
@@ -329,7 +282,7 @@ for folder in folders :
                             new_img_patch = new_img[i:(i+win_size[0]) ,j:(j+win_size[1])]
                             #new_img_patch = new_img_patch.astype(np.uint8)
                             #min_in = np.amin(new_img_patch)
-                            min_in = 127
+                            min_in = np.median(new_img_patch)
                             #equ = cv2.equalizeHist(new_img_patch)
                             #clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(12,12))
                             #new_img_patch = clahe.apply(new_img_patch)
