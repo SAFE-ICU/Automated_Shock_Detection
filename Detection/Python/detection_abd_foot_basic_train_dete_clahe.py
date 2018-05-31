@@ -22,20 +22,10 @@ from skimage import data, color, exposure
 from scipy import ndimage
 import math
 
-
+########## Loading pre-trained models ################
 with open('C:/aditya/Thermal_images/ai_2.0/All_training_data/models/finals/sk18_rf_F_NF_100pad5_in127_ori12', 'rb') as f:
    rf_F = cPickle.load(f)
 
-#with open('C:/aditya/Thermal_images/ai_2.0/All_training_data/models/finals/rf_F_NF1_100pad5_in127_ori9', 'rb') as f:
-#   rf_F = cPickle.load(f)
-#with open('C:/aditya/Thermal_images/ai_2.0/All_training_data/models/finals/rf_F_NF1_50pad5_in127', 'rb') as f:
-#    rf_F = cPickle.load(f)
-#with open('C:/aditya/Thermal_images/ai_2.0/All_training_data/models/full_dat_train_rf_F_NF1_50pad_equ', 'rb') as f:
-#    rf_F_equ = cPickle.load(f)
-#with open('C:/aditya/Thermal_images/ai_2.0/All_training_data/models/full_data_train_rf_A_NA_50pad2', 'rb') as f:
-#    rf_A = cPickle.load(f)
-#with open('C:/aditya/Thermal_images/ai_2.0/All_training_data/models/finals/rf_A_NA_50pad_in127_ori9', 'rb') as f:
-#    rf_A = cPickle.load(f)
 
 with open('C:/aditya/Thermal_images/ai_2.0/All_training_data/models/finals/sk18_rf_A_NA_50pad_in127_ori9', 'rb') as f:
     rf_A = cPickle.load(f)
@@ -63,12 +53,6 @@ with open('C:/aditya/Thermal_images/ai_2.0/regr_models/sk_18/regr_f_y_x', 'rb') 
 
 
 
-#preds = rf.predict(test_data) 
-#new_img = cv2.imread('F:/therml_images/daily_icu_imaging_data/7-16-2016/bed3/img_thermal_1468678228009.jpg')
-############# opn in image for win stide #### #######
-### cv2.BRISK(thresh=10, octaves=0)
-
-#detection_path = "C:/aditya/Thermal_images/HOG_Feature_Testing/opencv_work/contour_detect/"
 list_profiles = []
 list_profile_name = []
 #detection_path = "C:/aditya/Thermal_images/ai_2.0/Detection_All_Collected_Data/Data_for_Detection/Detections/sept2016/dete_foot_abd_clahe_with_rot/"
@@ -283,8 +267,8 @@ for folder in folders :
                     #non_zero_patch_foot = patch_thresh[np.nonzero(patch_thresh)]
                     #med_patch_foot = np.median(non_zero_patch_foot)
                     print(med_circle_foot)
-                #non_zero_patch_foot = patch_thresh[np.nonzero(patch_thresh)]
-                #med_patch_foot = np.median(non_zero_patch_foot)
+                    #non_zero_patch_foot = patch_thresh[np.nonzero(patch_thresh)]
+                    #med_patch_foot = np.median(non_zero_patch_foot)
                     '''
                     for cd in cds:
                         ax[0].add_patch(patches.Rectangle((n_leg[cd,0],n_leg[cd,1]),win_size[1],win_size[0],linewidth=1,edgecolor='b',facecolor='none'))
