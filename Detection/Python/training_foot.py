@@ -215,18 +215,9 @@ dat_test = np.array(dat_test)
 train_res = np.array(train_res)
 
 ########### spliting data in training and testing ##########
-#l = len(dat_test) #length of data 
-#f = round(l*(0.8))  #number of elements you need
-#f = 270
-#indx = sample(range(l),int(f))
-#rem_indx = list(set(range(l))- set(indx))
-#train_data = dat_test[indx] 
-#test_data = dat_test[rem_indx]
 X = dat_test
 y = train_res
-#y = label_binarize(train_res, classes=[0, 1])
-#n_samples, n_features = X.shape
-#n_classes = y.shape[1]
+
 random.seed(43)
 
 X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=.3,
@@ -278,8 +269,8 @@ print(rf.predict(X_test))
 print(rf.score(X_test, y_test))
 #cnf_matrix = confusion_matrix(y_test, y_pred)
 
-with open('C:/aditya/Thermal_images/ai_2.0/hog_detectors/hog_rf_F_NF_100pad5_in127_py3', 'wb') as f:
-    cPickle.dump(rf, f)
+#with open('C:/aditya/Thermal_images/ai_2.0/hog_detectors/hog_rf_F_NF_100pad5_in127_py3', 'wb') as f:
+#    cPickle.dump(rf, f)
 
 
 y_pred_rf = rf.predict_proba(X_test)[:, 1]
@@ -336,15 +327,7 @@ plt.title('ROC curve')
 plt.legend(loc='best')
 plt.show()
 
-'''
-
-with open('C:/aditya/Thermal_images/ai_2.0/All_training_data/models/finals/rf_F_NF1_100pad5_in127_clahe_ori12', 'wb') as f:
-    cPickle.dump(rf, f)
-
-#with open('C:/aditya/Thermal_images/HOG_Feature_Testing/rf_full_ladh_model', 'wb') as f:
-#    cPickle.dump(rf_full, f)
-
-'''
+################ optimizing the n-estimators and max-features #######
 RANDOM_STATE = 123
 
 # Generate a binary classification dataset.
