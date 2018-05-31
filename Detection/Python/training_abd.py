@@ -213,50 +213,12 @@ dat_test  = np.array(dat_test)
 train_res = np.array(train_res)
 
 ########### spliting data in training and testing ##########
-#l = len(dat_test) #length of data 
-#f = round(l*(0.8))  #number of elements you need
-#f = 270
-#indx =    (sample(range(l),int(f)))
-#indx =     sample(range(l),f)
-#rem_indx = list(set(range(l))- set(indx))
-
-#train_data = dat_test[indx]
-#test_data = dat_test[rem_indx]
-
-#train_data_labels = train_res[indx]
-#test_data_labels = train_res[rem_indx]
 
 X = dat_test
 y = train_res
 X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=.3,
                                                     random_state=0)
 
-#X_train, X_train_lr, y_train, y_train_lr = train_test_split(X_train,
- #                                                           y_train,
-  #                                                          test_size=0.5)
-
-
-#########
-#clf = svm.SVC()
-#clf.fit(train_data, train_data_labels)
-################## predictions on test set #############3
-#print(clf.predict(test_data))
-#clf.score(test_data,test_data_labels)
-################### random Forest ########### 
-#rf = RandomForestClassifier(n_estimators= int(round(math.sqrt(train_data.shape[1]))))
-#rf.fit(train_data, train_data_labels) # fit the data to the algorithm
-#y_pred = rf.predict(test_data)
-#y_test = test_data_labels
-#print(rf.predict(test_data))
-#print(rf.score(test_data, test_data_labels))
-#cnf_matrix = confusion_matrix(y_test, y_pred)
-######################################
-#with open('C:/aditya/Thermal_images/ai_2.0/All_training_data/models/finals/rf_A_NA_50pad_in127_ori9', 'wb') as f:
-#    cPickle.dump(rf, f)
-
-
-#rt = RandomTreesEmbedding(max_depth=3, n_estimators=150,max_features='log2', 
-#   random_state=0)
 
 rf = RandomForestClassifier(max_depth=3, n_estimators=310, max_features='log2',
 random_state=0)
@@ -309,7 +271,7 @@ print(rf.score(X_test, y_test))
 y_pred_rf = rf.predict_proba(X_test)[:, 1]
 fpr_rf, tpr_rf, _ = roc_curve(y_test, y_pred_rf)
 roc_auc = auc(fpr_rf , tpr_rf)
-
+########### ROC #####################################
 plt.figure(1)
 lw = 2 
 plt.plot([0, 1], [0, 1], 'k--')
@@ -342,70 +304,7 @@ plt.legend(loc='best')
 plt.show()
 
 
-
-'''
-sample_abd=[]
-sample_head=[]
-sample_diaper=[]
-sample_foot= []
-sample_not_foot = []
-
-for k in sample(range(len(list_hog_fd_abd)),int(round(len(list_hog_fd_abd)*(1)))):
-    sample_abd.append(list_hog_fd_abd[k])
-
-for k in sample(range(len(list_hog_fd_diaper)),int(round(len(list_hog_fd_diaper)*(1)))):
-    sample_diaper.append(list_hog_fd_diaper[k])
-
-for k in sample(range(len(list_hog_fd_head)),int(round(len(list_hog_fd_head)*(1)))):
-    sample_head.append(list_hog_fd_head[k])
-
-#for k in sample(range(len(list_hog_fd_no_foot)),round(len(list_hog_fd_no_foot)*(0.75))):
-#    sample_not_foot.append(list_hog_fd_no_foot[k])
-
-dat_test= list_hog_fd_foot + sample_abd+ sample_diaper + list_hog_fd_no_foot
-train_res= ['F']*len(list_hog_fd_foot)+ ['NF']*(len(sample_abd)+len(sample_diaper)+ len(list_hog_fd_no_foot)) 
-
-
-#dat_test= list_hog_fd_foot + list_hog_fd_abd+ list_hog_fd_diaper + list_hog_fd_head + list_hog_fd_no_foot
-#train_res= ['L']*len(list_hog_fd_foot)+ ['NL']*(len(list_hog_fd_abd)+len(list_hog_fd_diaper)+len(list_hog_fd_head)+ len(list_hog_fd_no_leg)) 
-#temp = dat_test[0].reshape(1,18600)
-dat_test = np.array(dat_test)
-#for i in range(dat_test.shape[0]):
-#    temp =  temp.append(dat_test[i].reshape(1,18600))
-
-train_res= np.array(train_res)
-
-########### spliting data in training and testing ##########
-l = len(dat_test) #length of data 
-f = round(l*(0.8))  #number of elements you need
-#f = 270
-indx = sample(range(l),int(f))
-rem_indx = list(set(range(l))- set(indx))
-train_data = dat_test[indx] 
-test_data = dat_test[rem_indx]
- 
-train_data_labels = train_res[indx]
-test_data_labels = train_res[rem_indx]
-
-#########
-#clf = svm.SVC()
-#clf.fit(train_data, train_data_labels)
-################## predictions on test set #############3
-#print(clf.predict(test_data))
-#clf.score(test_data,test_data_labels)
-################### random Forest ########### 
-rf = RandomForestClassifier(n_estimators= int(round(math.sqrt(train_data.shape[1]))))
-rf.fit(train_data, train_data_labels) # fit the data to the algorithm
-print(rf.predict(test_data))
-print(rf.score(test_data, test_data_labels))
-
-#with open('C:/aditya/Thermal_images/ai_2.0/All_training_data/models/finals/full_dat_train_rf_F_NF1_50pad_clahe2', 'wb') as f:
-#    cPickle.dump(rf, f)
-
-#with open('C:/aditya/Thermal_images/HOG_Feature_Testing/rf_full_ladh_model', 'wb') as f:
-#    cPickle.dump(rf_full, f)
-
-'''
+################ optimizing the n-estimators and max-features #########
 RANDOM_STATE = 123
 
 # Generate a binary classification dataset.
