@@ -8,8 +8,6 @@ output: html_document
 ```{r}
 .libPaths(c(.libPaths(), "C:/Users/PICU/Documents/R/win-library/3.3"))
 library(lme4)
-library(nlme)
-library(randomForest)
 library(caret)
 library(ROCR)
 library(scales)
@@ -57,7 +55,7 @@ data_for_mod_post30minshock$binary_SI_Sm_Tm <- as.factor(data_for_mod_post30mins
 data_for_mod_post30minshock$Rescaled_Median_PR <- rescale(data_for_mod_post30minshock$Median_PR, c(0,1))
 
 
-#################### glmer ##########
+#################### glmer ##########a
 byclass_glmer<- list(list()) 
 overall_Acc_glmer<- list(list()) 
 AUC_glmer_all <- list(list())
@@ -101,12 +99,13 @@ tr_set_sm_tm <- data.frame(data_for_mod_post30minshock[which(data_for_mod_post30
   pred_glmer_perf <- prediction(test_pred_sm_tm, test_set_sm_tm$binary_SI_Sm_Tm) 
   perf_glmer <- performance(pred_glmer_perf, "tpr", "fpr")
   cp_max_height_glmer <- cp_max_thrsh(perf_glmer) 
-  AUC_glmer= (performance(pred_glmer_perf, "auc")@y.values[[1]])
-  plot(perf_glmer,colorize =T, main=paste('ROC', 'Shock ind same time, AUC=', AUC_glmer,sep = ' ')) 
+  AUC_glmer= round((performance(pred_glmer_perf, "auc")@y.values[[1]]),2)
+  par(mar=c(9,6,6,6))
+  plot(perf_glmer,colorize =T, main=paste('ROC', 'Shock ind same time, AUC=', round(AUC_glmer,2),sep = ' '), cex.lab=1.5, cex.axis=2, cex.main=1.5, cex.sub=2)  
   result_vec <- as.numeric(unlist(test_pred_sm_tm) > cp_max_height_glmer)
   con <- data.frame(actual=test_set_sm_tm$binary_SI_Sm_Tm,result_vec)
   conf <- confusionMatrix(con$result_vec,reference = con$actual, positive = "1")
-  #print(conf)
+  print(conf)
   #i = 1
   
   coefficients_glmer[i] <- diff_coef
@@ -159,6 +158,17 @@ glmer_models_sum[1,] <- c(coefficients_glmer_sm_tm,
                           sd(ten_fold_byclass[,2]),
                           mean(ten_fold_cutoff[,1]))
 
+    performance_sm_tm  <- cbind((ten_fold_auc[,1]),
+                           (ten_fold_accuracy[,1]),
+                          (ten_fold_byclass[,1]),
+                          (ten_fold_byclass[,2]),
+                          (ten_fold_byclass[,3]),
+                          (ten_fold_byclass[,4]),
+                          (ten_fold_auc[,1]),
+                          (ten_fold_accuracy[,1]),
+                          (ten_fold_byclass[,1]),
+                          (ten_fold_byclass[,2]),
+                          (ten_fold_cutoff[,1]))
 ```
 
 ```{r}
@@ -222,12 +232,13 @@ for(i in 1:10){
   pred_glmer_perf <- prediction(test_pred_post3hr, test_set_post3hr$binary_SI_3hr)
   perf_glmer <- performance( pred_glmer_perf, "tpr", "fpr")
   cp_max_height_glmer <- cp_max_thrsh(perf_glmer) 
-  AUC_glmer= (performance(pred_glmer_perf, "auc")@y.values[[1]])
-  plot(perf_glmer,colorize =T, main=paste('ROC', 'Shock ind 3hr, AUC=', AUC_glmer,sep = ' ')) 
+  AUC_glmer= round((performance(pred_glmer_perf, "auc")@y.values[[1]]),2)
+  par(mar=c(8,5,5,5))
+  plot(perf_glmer,colorize =T, main=paste('ROC', 'Shock ind 3hr, AUC=', round(AUC_glmer,2),sep = ' '),cex.lab=1.5, cex.axis=2, cex.main=1.5, cex.sub=2) 
   result_vec <- as.numeric(unlist(test_pred_post3hr) > cp_max_height_glmer)
   con <- data.frame(actual=test_set_post3hr$binary_SI_3hr,result_vec)
   conf <- confusionMatrix(con$result_vec,reference = con$actual, positive = "1")
-  #print(conf)
+  print(conf)
   #i = 2
   
   coefficients_glmer[i] <- diff_coef
@@ -276,6 +287,18 @@ glmer_models_sum[2,] <- c(coefficients_glmer_3hr,
                           sd(ten_fold_byclass[,2]),
                           mean(ten_fold_cutoff[,1]))
 
+performance3hr  <- cbind((ten_fold_auc[,1]),
+                          (ten_fold_accuracy[,1]),
+                          (ten_fold_byclass[,1]),
+                          (ten_fold_byclass[,2]),
+                          (ten_fold_byclass[,3]),
+                          (ten_fold_byclass[,4]),
+                          (ten_fold_auc[,1]),
+                          (ten_fold_accuracy[,1]),
+                          (ten_fold_byclass[,1]),
+                          (ten_fold_byclass[,2]),
+                          (ten_fold_cutoff[,1]))
+
 ```
 
 ```{r}
@@ -310,7 +333,6 @@ for(i in 1:10){
   
   tr_uhid <- unique(data_for_mod_post6hrshock$UHID)[parts[[i]]]
   test_uhid <- unique(data_for_mod_post6hrshock$UHID)[-parts[[i]]]
-  
   tr_set_post6hr <- data.frame(data_for_mod_post6hrshock[which(data_for_mod_post6hrshock$UHID %in% tr_uhid),])
   test_set_post6hr <- data.frame(data_for_mod_post6hrshock[-which(data_for_mod_post6hrshock$UHID %in% tr_uhid),])
   
@@ -334,12 +356,13 @@ for(i in 1:10){
   pred_glmer_perf <- prediction(test_pred_post6hr, test_set_post6hr$binary_SI_6hr)
   perf_glmer <- performance( pred_glmer_perf, "tpr", "fpr")
   cp_max_height_glmer <- cp_max_thrsh(perf_glmer) 
-  AUC_glmer= (performance(pred_glmer_perf, "auc")@y.values[[1]])
-  plot(perf_glmer,colorize =T, main=paste('ROC', 'Shock ind at 6hr, AUC=', AUC_glmer,sep = ' ')) 
+  AUC_glmer= round((performance(pred_glmer_perf, "auc")@y.values[[1]]),2)
+  par(mar=c(8,5,5,5))
+  plot(perf_glmer,colorize =T, main=paste('ROC', 'Shock ind at 6hr, AUC=', round(AUC_glmer,2),sep = ' '),cex.lab=1.5, cex.axis=2, cex.main=1.5, cex.sub=2) 
   result_vec <- as.numeric(unlist(test_pred_post6hr) > cp_max_height_glmer)
   con <- data.frame(actual=test_set_post6hr$binary_SI_6hr,result_vec)
   conf <- confusionMatrix(con$result_vec,reference = con$actual, positive = "1")
-  #print(conf)
+  print(conf)
   #i = 3
   
   coefficients_glmer[i] <- diff_coef
@@ -387,6 +410,17 @@ glmer_models_sum[3,] <- c(coefficients_glmer_6hr,
                           sd(ten_fold_byclass[,1]),
                           sd(ten_fold_byclass[,2]),
                           mean(ten_fold_cutoff[,1]))
+performance6hr  <- cbind( (ten_fold_auc[,1]),
+                          (ten_fold_accuracy[,1]),
+                          (ten_fold_byclass[,1]),
+                          (ten_fold_byclass[,2]),
+                          (ten_fold_byclass[,3]),
+                          (ten_fold_byclass[,4]),
+                          (ten_fold_auc[,1]),
+                          (ten_fold_accuracy[,1]),
+                          (ten_fold_byclass[,1]),
+                          (ten_fold_byclass[,2]),
+                          (ten_fold_cutoff[,1]))
 
 ```
 
@@ -446,12 +480,13 @@ for(i in 1:10){
   pred_glmer_perf <- prediction(test_pred_post12hr, test_set_post12hr$binary_SI_12hr)
   perf_glmer <- performance( pred_glmer_perf, "tpr", "fpr")
   cp_max_height_glmer <- cp_max_thrsh(perf_glmer) 
-  AUC_glmer= (performance(pred_glmer_perf, "auc")@y.values[[1]])
-  plot(perf_glmer,colorize =T, main=paste('ROC', 'Shock ind at 12hr, AUC=', AUC_glmer,sep = ' ')) 
+  AUC_glmer= round((performance(pred_glmer_perf, "auc")@y.values[[1]]),2)
+  par(mar=c(8,5,5,5))
+  plot(perf_glmer,colorize =T, main=paste('ROC', 'Shock ind at 12hr, AUC=', round(AUC_glmer,2),sep = ' '), cex.lab=1.5, cex.axis=2, cex.main=1.5, cex.sub=2) 
   result_vec <- as.numeric(unlist(test_pred_post12hr) > cp_max_height_glmer)
   con <- data.frame(actual=test_set_post12hr$binary_SI_12hr,result_vec)
   conf <- confusionMatrix(con$result_vec,reference = con$actual, positive = "1")
-  #print(conf)
+  print(conf)
   
   #i = 4
   
@@ -501,8 +536,35 @@ glmer_models_sum[4,] <- c(coefficients_glmer_12hr,
                           sd(ten_fold_byclass[,2]),
                           mean(ten_fold_cutoff[,1]))
 
+performance12hr  <- cbind((ten_fold_auc[,1]),
+                          (ten_fold_accuracy[,1]),
+                          (ten_fold_byclass[,1]),
+                          (ten_fold_byclass[,2]),
+                          (ten_fold_byclass[,3]),
+                          (ten_fold_byclass[,4]),
+                          (ten_fold_auc[,1]),
+                          (ten_fold_accuracy[,1]),
+                          (ten_fold_byclass[,1]),
+                          (ten_fold_byclass[,2]),
+                          (ten_fold_cutoff[,1]))
+
+
+
+acc_disc <- rbind(performance_sm_tm, performance3hr, performance6hr, performance12hr)
+View(acc_disc)
+acc_disc  <- data.frame(acc_disc)
+
+colnames(acc_disc) <-c("AUC", "Accuracy", "Sensitivity", "Specificity", "ppv", "npv","AUC_sd", "Acc_sd", "Sens_sd","Speci_sd","Cut_off_ROC")
+
 print(glmer_models_sum)
+my_round <- function(x){round(x,2)}
+glmer_models_sum <- apply(glmer_models_sum, 2,my_round)
 
 print(glmer_models_sum)
 write.csv(glmer_models_sum, paste0(save_path, "summ_all_models.csv"), row.names = F)
+########### Boxplots ##########
+# acc_disc  <- data.frame(acc_disc) 
+# write.csv(acc_disc, "C:/aditya/Thermal_images/Final_models/Paper_figures/acc_disc_dete.csv", row.names= F)
+
+
 
